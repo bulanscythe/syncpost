@@ -142,5 +142,10 @@ export async function GET(request: NextRequest) {
     accessTokenExpiresAt,
   });
 
-  return NextResponse.redirect(new URL("/?instagram=connected", redirectUri));
+  const dashboardBaseUrl =
+    process.env.SYNCPOST_DASHBOARD_BASE_URL || "http://127.0.0.1:3000";
+
+  return NextResponse.redirect(
+    new URL("/?instagram=connected", dashboardBaseUrl),
+  );
 }
