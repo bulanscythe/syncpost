@@ -7,3 +7,6 @@ tmp/
 !.env.example
 
 !web/.env.example
+
+# SyncPost runtime logs
+web/logs/
