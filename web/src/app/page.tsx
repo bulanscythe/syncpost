@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { skipVideo } from "@/app/actions";
 import { listVideos, type VideoStatus } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +16,6 @@ const statusLabels: Record<VideoStatus, string> = {
 
 export default function Home() {
   const videos = listVideos();
-  const waiting = videos.filter(
-    (video) => video.status === "waiting_approval",
-  ).length;
 
   return (
     <main className="min-h-screen bg-zinc-50 px-6 py-10 text-zinc-900 sm:px-10">
@@ -41,17 +40,22 @@ export default function Home() {
         </header>
 
         <section className="mb-8 grid gap-4 sm:grid-cols-3">
-          <Stat label="Waiting approval" value={waiting.toString()} />
+          <Stat
+            label="Waiting approval"
+            value={videos
+              .filter((video) => video.status === "waiting_approval")
+              .length.toString()}
+          />
+          <Stat
+            label="Approved for publishing"
+            value={videos
+              .filter((video) => video.status === "approved")
+              .length.toString()}
+          />
           <Stat
             label="Published"
             value={videos
               .filter((video) => video.status === "published")
-              .length.toString()}
-          />
-          <Stat
-            label="Failed uploads"
-            value={videos
-              .filter((video) => video.status === "failed")
               .length.toString()}
           />
         </section>
@@ -61,13 +65,16 @@ export default function Home() {
             <div>
               <h2 className="text-xl font-semibold">Review queue</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                Approve videos only after checking the caption and Instagram destination.
+                Caption is copied exactly from the YouTube description.
               </p>
             </div>
 
-            <button className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium shadow-sm">
+            <Link
+              href="/"
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium shadow-sm"
+            >
               Refresh queue
-            </button>
+            </Link>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
@@ -88,6 +95,11 @@ export default function Home() {
                         : "YouTube Video"}
                     </span>
                     <StatusBadge status={video.status} />
+                    {video.targetType && (
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
+                        {video.targetType === "reel" ? "Reel" : "Feed Post"}
+                      </span>
+                    )}
                   </div>
 
                   <h3 className="truncate text-base font-semibold">
@@ -103,17 +115,30 @@ export default function Home() {
 
                 {video.status === "waiting_approval" ? (
                   <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
-                    <button className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white">
+                    <Link
+                      href={`/videos/${video.id}`}
+                      className="rounded-lg bg-zinc-900 px-4 py-2 text-center text-sm font-medium text-white"
+                    >
                       Review & approve
-                    </button>
-                    <button className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium">
-                      Skip
-                    </button>
+                    </Link>
+
+                    <form action={skipVideo}>
+                      <input type="hidden" name="id" value={video.id} />
+                      <button
+                        type="submit"
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium"
+                      >
+                        Skip
+                      </button>
+                    </form>
                   </div>
                 ) : (
-                  <button className="shrink-0 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium">
+                  <Link
+                    href={`/videos/${video.id}`}
+                    className="shrink-0 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-center text-sm font-medium"
+                  >
                     View details
-                  </button>
+                  </Link>
                 )}
               </article>
             ))}

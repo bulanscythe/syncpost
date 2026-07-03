@@ -217,3 +217,65 @@ export function listVideos(): Video[] {
     updatedAt: row.updated_at,
   }));
 }
+
+function mapVideoRow(row: VideoRow): Video {
+  return {
+    id: row.id,
+    youtubeId: row.youtube_id,
+    title: row.title,
+    description: row.description,
+    sourceType: row.source_type,
+    sourceUrl: row.source_url,
+    thumbnailUrl: row.thumbnail_url,
+    durationSeconds: row.duration_seconds,
+    status: row.status,
+    targetType: row.target_type,
+    publishedAt: row.published_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function getVideoById(id: string): Video | null {
+  const row = db
+    .prepare(`
+      SELECT
+        id,
+        youtube_id,
+        title,
+        description,
+        source_type,
+        source_url,
+        thumbnail_url,
+        duration_seconds,
+        status,
+        target_type,
+        published_at,
+        created_at,
+        updated_at
+      FROM videos
+      WHERE id = ?
+    `)
+    .get(id) as unknown as VideoRow | undefined;
+
+  return row ? mapVideoRow(row) : null;
+}
+
+export function updateVideoStatus(id: string, status: VideoStatus) {
+  db.prepare(`
+    UPDATE videos
+    SET status = ?, updated_at = ?
+    WHERE id = ?
+  `).run(status, new Date().toISOString(), id);
+}
+
+export function approveVideoForInstagram(
+  id: string,
+  targetType: InstagramTarget,
+) {
+  db.prepare(`
+    UPDATE videos
+    SET status = 'approved', target_type = ?, updated_at = ?
+    WHERE id = ?
+  `).run(targetType, new Date().toISOString(), id);
+}
