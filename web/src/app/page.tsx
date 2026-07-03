@@ -113,68 +113,14 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <div className="grid gap-6">
             {otherVideos.length === 0 ? (
-              <div className="p-10 text-center text-sm text-zinc-500">
+              <div className="rounded-2xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500 shadow-sm">
                 No processed videos yet.
               </div>
             ) : (
               otherVideos.map((video) => (
-                <article
-                  key={video.id}
-                  className="flex flex-col gap-5 border-b border-zinc-100 p-5 last:border-b-0 md:flex-row md:items-center"
-                >
-                  <div className="flex h-28 w-full shrink-0 items-end rounded-xl bg-zinc-900 p-3 text-xs font-medium text-white md:w-20">
-                    {video.durationSeconds > 0
-                      ? formatDuration(video.durationSeconds)
-                      : "—"}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
-                        {video.sourceType === "short"
-                          ? "YouTube Short"
-                          : "YouTube Video"}
-                      </span>
-                      <StatusBadge status={video.status} />
-                      {video.targetType && (
-                        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
-                          {video.targetType === "reel" ? "Reel" : "Feed Post"}
-                        </span>
-                      )}
-                      {video.metadataError && (
-                        <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-800">
-                          Needs YouTube login
-                        </span>
-                      )}
-                    </div>
-
-                    <h3 className="truncate text-base font-semibold">
-                      {video.title}
-                    </h3>
-                    <p className="mt-1 text-sm text-zinc-500">
-                      {formatPublishedAt(video.publishedAt)}
-                    </p>
-                    <p className="mt-3 line-clamp-2 whitespace-pre-line text-sm text-zinc-600">
-                      {video.description || "No YouTube description."}
-                    </p>
-                  </div>
-
-                  {video.status === "failed" && (
-                    <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
-                      <form action={retryFailedVideo}>
-                        <input type="hidden" name="id" value={video.id} />
-                        <button
-                          type="submit"
-                          className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
-                        >
-                          Retry publish
-                        </button>
-                      </form>
-                    </div>
-                  )}
-                </article>
+                <ProcessedVideoCard key={video.id} video={video} />
               ))
             )}
           </div>
@@ -225,4 +171,92 @@ function formatPublishedAt(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function ProcessedVideoCard({ video }: { video: ReturnType<typeof listVideos>[0] }) {
+  const youtubeUrl = `https://youtube.com/shorts/${video.youtubeId}`;
+  
+  return (
+    <details className="group flex flex-col gap-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition [&_summary::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer items-start gap-4 focus:outline-none">
+        <div className="flex-1">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+              {video.sourceType === "short" ? "YouTube Short" : "YouTube Video"}
+            </span>
+            <StatusBadge status={video.status} />
+            {video.targetType && (
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
+                {video.targetType === "reel" ? "Reel" : "Feed Post"}
+              </span>
+            )}
+            {video.metadataError && (
+              <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-800">
+                Needs YouTube login
+              </span>
+            )}
+          </div>
+          <h3 className="text-base font-semibold group-open:text-zinc-900">{video.title}</h3>
+          <p className="mt-1 text-sm text-zinc-500">
+            {formatDuration(video.durationSeconds)} · {formatPublishedAt(video.publishedAt)}
+          </p>
+        </div>
+
+        {video.status === "failed" && (
+           <form action={retryFailedVideo} className="shrink-0" onClick={(e) => e.stopPropagation()}>
+             <input type="hidden" name="id" value={video.id} />
+             <button
+               type="submit"
+               className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+             >
+               Retry publish
+             </button>
+           </form>
+        )}
+      </summary>
+      
+      <div className="mt-6 grid gap-6 border-t border-zinc-100 pt-6 md:grid-cols-2">
+        <div>
+          <div className="mb-4">
+            <h4 className="mb-2 text-sm font-medium text-zinc-700">Caption used</h4>
+            <p className="whitespace-pre-line rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm text-zinc-600">
+              {video.description || "No caption provided."}
+            </p>
+          </div>
+          
+          <div className="mb-4">
+            <h4 className="mb-2 text-sm font-medium text-zinc-700">External Links</h4>
+            <div className="flex flex-col gap-2">
+              <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                View original YouTube Short ↗
+              </a>
+              {video.instagramPermalink && (
+                <a href={video.instagramPermalink} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                  View published Instagram Post ↗
+                </a>
+              )}
+            </div>
+          </div>
+          {video.publishError && (
+             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+               <h4 className="mb-1 text-sm font-medium text-red-800">Publishing Error</h4>
+               <p className="break-words text-xs text-red-700">{video.publishError}</p>
+             </div>
+          )}
+        </div>
+        <div className="overflow-hidden rounded-xl bg-zinc-900">
+          <iframe
+            width="100%"
+            height="315"
+            src={`https://www.youtube.com/embed/${video.youtubeId}`}
+            title="YouTube video player"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            className="h-full min-h-[250px] w-full"
+          ></iframe>
+        </div>
+      </div>
+    </details>
+  );
 }
