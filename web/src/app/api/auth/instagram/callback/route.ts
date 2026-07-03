@@ -64,7 +64,6 @@ export async function GET(request: NextRequest) {
 
   const tokenPayload = (await tokenResponse.json()) as {
     access_token?: string;
-    user_id?: string | number;
     error_type?: string;
     error_message?: string;
   };
@@ -78,9 +77,43 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const longLivedTokenUrl = new URL(
+    "https://graph.instagram.com/access_token",
+  );
+  longLivedTokenUrl.searchParams.set("grant_type", "ig_exchange_token");
+  longLivedTokenUrl.searchParams.set("client_secret", appSecret);
+  longLivedTokenUrl.searchParams.set("access_token", tokenPayload.access_token);
+
+  const longLivedResponse = await fetch(longLivedTokenUrl, {
+    cache: "no-store",
+  });
+
+  const longLivedPayload = (await longLivedResponse.json()) as {
+    access_token?: string;
+    expires_in?: number;
+    error?: { message?: string };
+  };
+
+  if (!longLivedResponse.ok || !longLivedPayload.access_token) {
+    return new NextResponse(
+      `Instagram long-lived token exchange failed: ${
+        longLivedPayload.error?.message || "Unknown error"
+      }`,
+      { status: 400 },
+    );
+  }
+
+  const accessToken = longLivedPayload.access_token;
+  const accessTokenExpiresAt =
+    typeof longLivedPayload.expires_in === "number"
+      ? new Date(
+          Date.now() + longLivedPayload.expires_in * 1000,
+        ).toISOString()
+      : null;
+
   const profileResponse = await fetch(
-    `https://graph.instagram.com/me?fields=id,username,account_type&access_token=${encodeURIComponent(
-      tokenPayload.access_token,
+    `https://graph.instagram.com/v24.0/me?fields=id,username,account_type&access_token=${encodeURIComponent(
+      accessToken,
     )}`,
     { cache: "no-store" },
   );
@@ -105,7 +138,8 @@ export async function GET(request: NextRequest) {
     instagramUserId: String(profile.id),
     username: profile.username,
     accountType: profile.account_type || null,
-    accessToken: tokenPayload.access_token,
+    accessToken,
+    accessTokenExpiresAt,
   });
 
   return NextResponse.redirect(new URL("/?instagram=connected", redirectUri));

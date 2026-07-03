@@ -67,6 +67,35 @@ if (!columns.some((column) => column.name === "metadata_error")) {
   db.exec("ALTER TABLE videos ADD COLUMN metadata_error TEXT");
 }
 
+const instagramColumns = db
+  .prepare("PRAGMA table_info(instagram_accounts)")
+  .all();
+
+if (
+  instagramColumns.length > 0 &&
+  !instagramColumns.some(
+    (column) => column.name === "access_token_expires_at",
+  )
+) {
+  db.exec(
+    "ALTER TABLE instagram_accounts ADD COLUMN access_token_expires_at TEXT",
+  );
+}
+
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS temporary_media_files (
+    token TEXT PRIMARY KEY,
+    youtube_id TEXT NOT NULL,
+    absolute_path TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS temporary_media_files_expires_idx
+  ON temporary_media_files(expires_at);
+`);
+
 db.close();
 
 console.log("Database initialized.");

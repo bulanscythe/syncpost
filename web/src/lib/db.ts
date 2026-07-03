@@ -229,6 +229,16 @@ export type InstagramAccount = {
   username: string;
   accountType: string | null;
   connectedAt: string;
+  accessTokenExpiresAt: string | null;
+};
+
+type InstagramAccountRow = {
+  instagram_user_id: string;
+  username: string;
+  account_type: string | null;
+  access_token: string;
+  connected_at: string;
+  access_token_expires_at: string | null;
 };
 
 export function createOAuthState(state: string, provider: string) {
@@ -261,11 +271,13 @@ export function saveInstagramAccount({
   username,
   accountType,
   accessToken,
+  accessTokenExpiresAt,
 }: {
   instagramUserId: string;
   username: string;
   accountType: string | null;
   accessToken: string;
+  accessTokenExpiresAt: string | null;
 }) {
   const now = new Date().toISOString();
 
@@ -277,13 +289,15 @@ export function saveInstagramAccount({
       account_type,
       access_token,
       connected_at,
-      updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      updated_at,
+      access_token_expires_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(instagram_user_id) DO UPDATE SET
       username = excluded.username,
       account_type = excluded.account_type,
       access_token = excluded.access_token,
-      updated_at = excluded.updated_at
+      updated_at = excluded.updated_at,
+      access_token_expires_at = excluded.access_token_expires_at
   `).run(
     `ig-${instagramUserId}`,
     instagramUserId,
@@ -292,7 +306,18 @@ export function saveInstagramAccount({
     accessToken,
     now,
     now,
+    accessTokenExpiresAt,
   );
+}
+
+function mapInstagramAccount(row: InstagramAccountRow): InstagramAccount {
+  return {
+    instagramUserId: row.instagram_user_id,
+    username: row.username,
+    accountType: row.account_type,
+    connectedAt: row.connected_at,
+    accessTokenExpiresAt: row.access_token_expires_at,
+  };
 }
 
 export function getInstagramAccount(): InstagramAccount | null {
@@ -301,25 +326,96 @@ export function getInstagramAccount(): InstagramAccount | null {
       instagram_user_id,
       username,
       account_type,
-      connected_at
+      access_token,
+      connected_at,
+      access_token_expires_at
     FROM instagram_accounts
     ORDER BY updated_at DESC
     LIMIT 1
-  `).get() as
+  `).get() as InstagramAccountRow | undefined;
+
+  return row ? mapInstagramAccount(row) : null;
+}
+
+export function getInstagramPublishingCredentials() {
+  const row = db.prepare(`
+    SELECT
+      instagram_user_id,
+      username,
+      account_type,
+      access_token,
+      connected_at,
+      access_token_expires_at
+    FROM instagram_accounts
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `).get() as InstagramAccountRow | undefined;
+
+  if (!row) return null;
+
+  return {
+    ...mapInstagramAccount(row),
+    accessToken: row.access_token,
+  };
+}
+
+
+export type TemporaryMediaFile = {
+  token: string;
+  youtubeId: string;
+  absolutePath: string;
+  expiresAt: string;
+};
+
+export function createTemporaryMediaFile({
+  token,
+  youtubeId,
+  absolutePath,
+  expiresAt,
+}: TemporaryMediaFile) {
+  db.prepare(`
+    INSERT INTO temporary_media_files (
+      token,
+      youtube_id,
+      absolute_path,
+      expires_at,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?)
+  `).run(
+    token,
+    youtubeId,
+    absolutePath,
+    expiresAt,
+    new Date().toISOString(),
+  );
+}
+
+export function getTemporaryMediaFile(
+  token: string,
+): TemporaryMediaFile | null {
+  const row = db.prepare(`
+    SELECT
+      token,
+      youtube_id,
+      absolute_path,
+      expires_at
+    FROM temporary_media_files
+    WHERE token = ?
+  `).get(token) as
     | {
-        instagram_user_id: string;
-        username: string;
-        account_type: string | null;
-        connected_at: string;
+        token: string;
+        youtube_id: string;
+        absolute_path: string;
+        expires_at: string;
       }
     | undefined;
 
   if (!row) return null;
 
   return {
-    instagramUserId: row.instagram_user_id,
-    username: row.username,
-    accountType: row.account_type,
-    connectedAt: row.connected_at,
+    token: row.token,
+    youtubeId: row.youtube_id,
+    absolutePath: row.absolute_path,
+    expiresAt: row.expires_at,
   };
 }

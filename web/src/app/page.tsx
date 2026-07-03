@@ -43,6 +43,12 @@ export default function Home() {
                 <p className="mt-1 text-xs text-emerald-700">
                   Connected · {instagramAccount.accountType || "Professional"}
                 </p>
+                <a
+                  href="/api/auth/instagram"
+                  className="mt-2 inline-block text-xs font-medium underline underline-offset-4"
+                >
+                  Reconnect Instagram
+                </a>
               </>
             ) : (
               <a
