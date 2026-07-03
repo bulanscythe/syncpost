@@ -1,10 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { XMLParser } from "fast-xml-parser";
 import {
   getVideoByYouTubeId,
   removeDevelopmentVideos,
   upsertYouTubeVideo,
   getSetting,
+  listVideos,
+  deleteVideo,
   type SourceType,
   type Video,
   type YouTubeVideoInput,
@@ -39,41 +40,48 @@ function asText(value: unknown): string {
     : "";
 }
 
-function parseFeed(xml: string): FeedVideo[] {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: "@_",
-  });
+function fetchChannelVideosWithYtDlp(channelId: string): FeedVideo[] {
+  const url = `https://www.youtube.com/channel/${channelId}`;
+  const raw = execFileSync(
+    "yt-dlp",
+    [
+      "--dump-single-json",
+      "--playlist-items",
+      "1-15",
+      "--flat-playlist",
+      url,
+    ],
+    {
+      encoding: "utf8",
+      timeout: 60_000,
+      maxBuffer: 10 * 1024 * 1024,
+    }
+  );
 
-  const parsed = asRecord(parser.parse(xml));
-  const feed = asRecord(parsed.feed);
-  const entries = asArray(feed.entry);
+  const playlist = JSON.parse(raw) as Record<string, unknown>;
+  const entries = asArray(playlist.entries);
 
   return entries.flatMap((rawEntry) => {
     const entry = asRecord(rawEntry);
-    const youtubeId = asText(entry["yt:videoId"]);
+    const youtubeId = asText(entry.id);
+    const title = asText(entry.title);
+    const sourceUrl = asText(entry.url);
 
-    const links = asArray(entry.link).map(asRecord);
-    const sourceUrl = asText(
-      links.find((link) => link["@_rel"] === "alternate")?.["@_href"],
-    );
-
+    // SyncPost is primarily for Shorts. You can remove the includes("/shorts/") check if you want to sync all videos.
     if (!youtubeId || !sourceUrl || !sourceUrl.includes("/shorts/")) return [];
 
-    const mediaGroup = asRecord(entry["media:group"]);
-    const thumbnails = asArray(mediaGroup["media:thumbnail"]).map(asRecord);
-    const thumbnailUrl =
-      asText(thumbnails[0]?.["@_url"]) || null;
+    const thumbnails = asArray(entry.thumbnails).map(asRecord);
+    const thumbnailUrl = asText(thumbnails[0]?.url) || null;
 
     return [
       {
         youtubeId,
-        title: asText(entry.title) || "Untitled YouTube upload",
-        description: asText(mediaGroup["media:description"]),
+        title: title || "Untitled YouTube upload",
+        description: "",
         sourceType: sourceUrl.includes("/shorts/") ? "short" : "video",
         sourceUrl,
         thumbnailUrl,
-        publishedAt: asText(entry.published) || new Date().toISOString(),
+        publishedAt: new Date().toISOString(),
       },
     ];
   });
@@ -92,14 +100,14 @@ function useFeedData(
     thumbnailUrl: existing?.thumbnailUrl || video.thumbnailUrl,
     durationSeconds: existing?.durationSeconds ?? 0,
     metadataError: existing?.metadataError ?? null,
-    publishedAt: video.publishedAt,
+    publishedAt: existing?.publishedAt ?? video.publishedAt,
   };
 }
 
 function enrichWithYtDlp(
   video: FeedVideo,
   existing?: Video,
-): YouTubeVideoInput {
+): YouTubeVideoInput & { isDeleted?: boolean } {
   try {
     const raw = execFileSync(
       "yt-dlp",
@@ -117,6 +125,14 @@ function enrichWithYtDlp(
     );
 
     const metadata = JSON.parse(raw) as Record<string, unknown>;
+
+    let publishedAt = video.publishedAt;
+    if (typeof metadata.timestamp === "number") {
+      publishedAt = new Date(metadata.timestamp * 1000).toISOString();
+    } else if (typeof metadata.upload_date === "string" && metadata.upload_date.length === 8) {
+      const ud = metadata.upload_date;
+      publishedAt = new Date(`${ud.slice(0, 4)}-${ud.slice(4, 6)}-${ud.slice(6, 8)}T00:00:00Z`).toISOString();
+    }
 
     return {
       ...useFeedData(video, existing),
@@ -136,9 +152,24 @@ function enrichWithYtDlp(
         typeof metadata.duration === "number"
           ? Math.round(metadata.duration)
           : existing?.durationSeconds ?? 0,
+      publishedAt,
       metadataError: null,
     };
-  } catch {
+  } catch (error: any) {
+    const stderr = error.stderr?.toString() || error.message || "";
+    
+    // Check if video is deleted/private
+    if (
+      stderr.includes("Video unavailable") ||
+      stderr.includes("Private video") ||
+      stderr.includes("not found")
+    ) {
+      return {
+        ...useFeedData(video, existing),
+        isDeleted: true,
+      };
+    }
+
     if (existing) {
       return useFeedData(video, existing);
     }
@@ -162,16 +193,7 @@ export async function syncYouTubeChannel({
     throw new Error("YOUTUBE_CHANNEL_ID is missing from .env.local.");
   }
 
-  const response = await fetch(
-    `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`,
-    { cache: "no-store" },
-  );
-
-  if (!response.ok) {
-    throw new Error(`YouTube RSS request failed with status ${response.status}.`);
-  }
-
-  const entries = parseFeed(await response.text());
+  const entries = fetchChannelVideosWithYtDlp(channelId);
 
   removeDevelopmentVideos();
 
@@ -180,11 +202,35 @@ export async function syncYouTubeChannel({
 
   const autoApprove = getSetting("auto_approve_shorts") === "1";
 
+  // Build a map of the recent entries for quick lookup
+  const recentYoutubeIds = new Set(entries.map(e => e.youtubeId));
+
+  // Get all existing waiting_approval videos from DB
+  const waitingVideos = listVideos().filter(v => v.status === "waiting_approval");
+  
+  // Combine recent entries and old waiting videos so we can check if they are deleted
+  for (const waiting of waitingVideos) {
+    if (!recentYoutubeIds.has(waiting.youtubeId)) {
+      entries.push({
+        youtubeId: waiting.youtubeId,
+        title: waiting.title,
+        description: waiting.description,
+        sourceType: waiting.sourceType,
+        sourceUrl: waiting.sourceUrl,
+        thumbnailUrl: waiting.thumbnailUrl,
+        publishedAt: waiting.publishedAt,
+      });
+    }
+  }
+
   for (const entry of entries) {
     const existing = getVideoByYouTubeId(entry.youtubeId);
-    const shouldEnrich = refreshMetadata || !existing;
+    
+    // Always enrich if refreshing, if it's new, or if we are verifying an old waiting video not in the recent list
+    const isOldWaiting = existing?.status === "waiting_approval" && !recentYoutubeIds.has(entry.youtubeId);
+    const shouldEnrich = refreshMetadata || !existing || isOldWaiting;
 
-    const video = shouldEnrich
+    const videoResult: YouTubeVideoInput & { isDeleted?: boolean } = shouldEnrich
       ? enrichWithYtDlp(entry, existing || undefined)
       : useFeedData(entry, existing);
 
@@ -192,16 +238,21 @@ export async function syncYouTubeChannel({
       metadataLookups += 1;
     }
 
-    if (video.metadataError) {
+    if (videoResult.isDeleted && existing) {
+      deleteVideo(existing.id);
+      continue;
+    }
+
+    if (videoResult.metadataError) {
       metadataIncomplete += 1;
     }
     
-    if (autoApprove) {
-      video.status = "approved";
-      video.targetType = "reel";
+    if (autoApprove && (!existing || existing.status === "waiting_approval")) {
+      videoResult.status = "approved";
+      videoResult.targetType = "reel";
     }
 
-    upsertYouTubeVideo(video);
+    upsertYouTubeVideo(videoResult);
   }
 
   return {
