@@ -34,6 +34,11 @@ db.exec(`
     ),
     target_type TEXT CHECK (target_type IN ('reel', 'feed_post')),
     metadata_error TEXT,
+    instagram_container_id TEXT,
+    publish_attempt_at TEXT,
+    instagram_media_id TEXT,
+    instagram_permalink TEXT,
+    publish_error TEXT,
     published_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -59,12 +64,32 @@ db.exec(`
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 const columns = db.prepare("PRAGMA table_info(videos)").all();
 
 if (!columns.some((column) => column.name === "metadata_error")) {
   db.exec("ALTER TABLE videos ADD COLUMN metadata_error TEXT");
+}
+if (!columns.some((column) => column.name === "instagram_container_id")) {
+  db.exec("ALTER TABLE videos ADD COLUMN instagram_container_id TEXT");
+}
+if (!columns.some((column) => column.name === "publish_attempt_at")) {
+  db.exec("ALTER TABLE videos ADD COLUMN publish_attempt_at TEXT");
+}
+if (!columns.some((column) => column.name === "instagram_media_id")) {
+  db.exec("ALTER TABLE videos ADD COLUMN instagram_media_id TEXT");
+}
+if (!columns.some((column) => column.name === "instagram_permalink")) {
+  db.exec("ALTER TABLE videos ADD COLUMN instagram_permalink TEXT");
+}
+if (!columns.some((column) => column.name === "publish_error")) {
+  db.exec("ALTER TABLE videos ADD COLUMN publish_error TEXT");
 }
 
 const instagramColumns = db

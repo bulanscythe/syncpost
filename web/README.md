@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SyncPost
 
-## Getting Started
+SyncPost automates publishing YouTube videos to Instagram using the Meta API.
 
-First, run the development server:
+## Architecture & Hardening
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### Global Publisher Lock
+The publisher process (`web/scripts/process-approved-video.mjs`) uses a robust lock file mechanism (`tmp/publisher.lock/owner.json`). Only one publisher process can run at a time to prevent duplicate publishes and data corruption. If a process crashes, the lock records the PID, hostname, and start time, and a new process can safely reclaim the lock once it confirms the previous PID is dead.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Stuck-Job Recovery & Crash Safety
+If a publisher crashes while a video is:
+- **Downloading**: The video is automatically reset to `approved` status after `SYNCPOST_STUCK_JOB_MINUTES` (default 30 mins) on the next run.
+- **Publishing**: The video is safely transitioned to `failed`. Because an interruption during publishing might still result in a successful Instagram post, it requires human verification before a manual retry. 
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Manual Retry
+Failed jobs will show a **Retry publish** button on the dashboard. Before clicking it, verify on the Instagram app that the video was not already published, to avoid duplicate posts.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Token Refresh
+Instagram long-lived tokens expire after 60 days. The script `web/scripts/refresh-instagram-token.mjs` (run via `run-token-refresh-once.sh`) can be scheduled (e.g. via cron/launchd once a day) to automatically refresh the token when it's within `SYNCPOST_TOKEN_REFRESH_WINDOW_DAYS` (default 14 days) of expiry.
 
-## Learn More
+## VPS Migration & Cron Setup
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+When migrating from macOS to a VPS (e.g. Ubuntu):
+1. **Data Migration**: Copy the `data/` directory (contains the SQLite DB) and `web/.env.local`. Do NOT copy `tmp/` as it contains stale locks tied to the previous hostname.
+2. **Cron Setup**: Schedule the background scripts. Example crontab:
+   ```cron
+   # Run the publisher every minute
+   * * * * * cd /path/to/syncpost/web && ./scripts/run-publisher-once.sh >> logs/publisher.log 2>&1
+   
+   # Sync YouTube every 15 minutes
+   */15 * * * * cd /path/to/syncpost/web && ./scripts/run-youtube-sync-once.sh >> logs/youtube.log 2>&1
+   
+   # Refresh Instagram token once a day
+   0 0 * * * cd /path/to/syncpost/web && ./scripts/run-token-refresh-once.sh >> logs/token.log 2>&1
+   ```

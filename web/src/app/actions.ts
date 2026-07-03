@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   approveVideoForInstagram,
+  retryVideoForInstagram,
   updateVideoStatus,
   type InstagramTarget,
 } from "@/lib/db";
@@ -32,4 +33,28 @@ export async function approveVideo(formData: FormData) {
   approveVideoForInstagram(id, targetType as InstagramTarget);
   revalidatePath("/");
   redirect("/");
+}
+
+export async function retryFailedVideo(formData: FormData) {
+  const id = formData.get("id");
+
+  if (typeof id !== "string" || !id) return;
+
+  retryVideoForInstagram(id);
+  revalidatePath("/");
+}
+
+export async function bulkApproveVideos(
+  data: { id: string; targetType: InstagramTarget; description: string }[]
+) {
+  for (const item of data) {
+    approveVideoForInstagram(item.id, item.targetType, item.description);
+  }
+  revalidatePath("/");
+}
+
+export async function toggleAutoApprove(enabled: boolean) {
+  const { setSetting } = await import("@/lib/db");
+  setSetting("auto_approve_shorts", enabled ? "1" : "0");
+  revalidatePath("/");
 }

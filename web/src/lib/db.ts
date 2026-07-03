@@ -26,6 +26,11 @@ export type Video = {
   status: VideoStatus;
   targetType: InstagramTarget | null;
   metadataError: string | null;
+  instagramContainerId: string | null;
+  publishAttemptAt: string | null;
+  instagramMediaId: string | null;
+  instagramPermalink: string | null;
+  publishError: string | null;
   publishedAt: string;
   createdAt: string;
   updatedAt: string;
@@ -41,6 +46,8 @@ export type YouTubeVideoInput = {
   durationSeconds: number;
   metadataError: string | null;
   publishedAt: string;
+  status?: VideoStatus;
+  targetType?: InstagramTarget;
 };
 
 type VideoRow = {
@@ -55,6 +62,11 @@ type VideoRow = {
   status: VideoStatus;
   target_type: InstagramTarget | null;
   metadata_error: string | null;
+  instagram_container_id: string | null;
+  publish_attempt_at: string | null;
+  instagram_media_id: string | null;
+  instagram_permalink: string | null;
+  publish_error: string | null;
   published_at: string;
   created_at: string;
   updated_at: string;
@@ -82,6 +94,11 @@ function mapVideoRow(row: VideoRow): Video {
     status: row.status,
     targetType: row.target_type,
     metadataError: row.metadata_error,
+    instagramContainerId: row.instagram_container_id,
+    publishAttemptAt: row.publish_attempt_at,
+    instagramMediaId: row.instagram_media_id,
+    instagramPermalink: row.instagram_permalink,
+    publishError: row.publish_error,
     publishedAt: row.published_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -103,6 +120,11 @@ export function listVideos(): Video[] {
         status,
         target_type,
         metadata_error,
+        instagram_container_id,
+        publish_attempt_at,
+        instagram_media_id,
+        instagram_permalink,
+        publish_error,
         published_at,
         created_at,
         updated_at
@@ -140,6 +162,11 @@ export function getVideoById(id: string): Video | null {
         status,
         target_type,
         metadata_error,
+        instagram_container_id,
+        publish_attempt_at,
+        instagram_media_id,
+        instagram_permalink,
+        publish_error,
         published_at,
         created_at,
         updated_at
@@ -168,6 +195,11 @@ export function getVideoByYouTubeId(
         status,
         target_type,
         metadata_error,
+        instagram_container_id,
+        publish_attempt_at,
+        instagram_media_id,
+        instagram_permalink,
+        publish_error,
         published_at,
         created_at,
         updated_at
@@ -190,12 +222,34 @@ export function updateVideoStatus(id: string, status: VideoStatus) {
 export function approveVideoForInstagram(
   id: string,
   targetType: InstagramTarget,
+  description?: string,
 ) {
+  if (description !== undefined) {
+    db.prepare(`
+      UPDATE videos
+      SET status = 'approved', target_type = ?, description = ?, updated_at = ?
+      WHERE id = ? AND metadata_error IS NULL
+    `).run(targetType, description, new Date().toISOString(), id);
+  } else {
+    db.prepare(`
+      UPDATE videos
+      SET status = 'approved', target_type = ?, updated_at = ?
+      WHERE id = ? AND metadata_error IS NULL
+    `).run(targetType, new Date().toISOString(), id);
+  }
+}
+
+export function retryVideoForInstagram(id: string) {
   db.prepare(`
     UPDATE videos
-    SET status = 'approved', target_type = ?, updated_at = ?
-    WHERE id = ? AND metadata_error IS NULL
-  `).run(targetType, new Date().toISOString(), id);
+    SET 
+      status = 'approved',
+      publish_error = NULL,
+      publish_attempt_at = NULL,
+      instagram_container_id = NULL,
+      updated_at = ?
+    WHERE id = ? AND status = 'failed'
+  `).run(new Date().toISOString(), id);
 }
 
 export function upsertYouTubeVideo(video: YouTubeVideoInput) {
@@ -217,7 +271,7 @@ export function upsertYouTubeVideo(video: YouTubeVideoInput) {
       published_at,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting_approval', NULL, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(youtube_id) DO UPDATE SET
       title = excluded.title,
       description = excluded.description,
@@ -227,7 +281,15 @@ export function upsertYouTubeVideo(video: YouTubeVideoInput) {
       duration_seconds = excluded.duration_seconds,
       metadata_error = excluded.metadata_error,
       published_at = excluded.published_at,
-      updated_at = excluded.updated_at
+      updated_at = excluded.updated_at,
+      status = CASE 
+        WHEN excluded.status = 'approved' AND videos.status = 'waiting_approval' THEN 'approved'
+        ELSE videos.status 
+      END,
+      target_type = CASE 
+        WHEN excluded.status = 'approved' AND videos.status = 'waiting_approval' THEN excluded.target_type
+        ELSE videos.target_type 
+      END
   `).run(
     `yt-${video.youtubeId}`,
     video.youtubeId,
@@ -237,6 +299,8 @@ export function upsertYouTubeVideo(video: YouTubeVideoInput) {
     video.sourceUrl,
     video.thumbnailUrl,
     video.durationSeconds,
+    video.status || "waiting_approval",
+    video.targetType || null,
     video.metadataError,
     video.publishedAt,
     now,
@@ -446,4 +510,19 @@ export function getTemporaryMediaFile(
     absolutePath: row.absolute_path,
     expiresAt: row.expires_at,
   };
+}
+
+export function getSetting(key: string): string | null {
+  const row = db
+    .prepare("SELECT value FROM settings WHERE key = ?")
+    .get(key) as { value: string } | undefined;
+  return row ? row.value : null;
+}
+
+export function setSetting(key: string, value: string) {
+  db.prepare(`
+    INSERT INTO settings (key, value)
+    VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(key, value);
 }

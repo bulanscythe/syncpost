@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { SyncYouTubeButton } from "@/components/SyncYouTubeButton";
-import { skipVideo } from "@/app/actions";
-import { getInstagramAccount, listVideos, type VideoStatus } from "@/lib/db";
+import { skipVideo, retryFailedVideo } from "@/app/actions";
+import { getInstagramAccount, listVideos, getSetting, type VideoStatus } from "@/lib/db";
+import { ReviewQueueClient } from "@/components/ReviewQueueClient";
+import { AutoApproveToggle } from "@/components/AutoApproveToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,9 @@ const statusLabels: Record<VideoStatus, string> = {
 export default function Home() {
   const videos = listVideos();
   const instagramAccount = getInstagramAccount();
+  const autoApprove = getSetting("auto_approve_shorts") === "1";
+  const waitingVideos = videos.filter((v) => v.status === "waiting_approval");
+  const otherVideos = videos.filter((v) => v.status !== "waiting_approval");
 
   return (
     <main className="min-h-screen bg-zinc-50 px-6 py-10 text-zinc-900 sm:px-10">
@@ -59,6 +64,7 @@ export default function Home() {
               </a>
             )}
           </div>
+          <AutoApproveToggle enabled={autoApprove} />
         </header>
 
         <section className="mb-8 grid gap-4 sm:grid-cols-3">
@@ -94,13 +100,26 @@ export default function Home() {
             <SyncYouTubeButton />
           </div>
 
+          <div className="mb-10">
+            <ReviewQueueClient videos={waitingVideos} />
+          </div>
+
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Processed Videos</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                Videos that have been approved, published, skipped, or failed.
+              </p>
+            </div>
+          </div>
+
           <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-            {videos.length === 0 ? (
+            {otherVideos.length === 0 ? (
               <div className="p-10 text-center text-sm text-zinc-500">
-                No videos yet. Sync YouTube to load recent public uploads.
+                No processed videos yet.
               </div>
             ) : (
-              videos.map((video) => (
+              otherVideos.map((video) => (
                 <article
                   key={video.id}
                   className="flex flex-col gap-5 border-b border-zinc-100 p-5 last:border-b-0 md:flex-row md:items-center"
@@ -142,32 +161,18 @@ export default function Home() {
                     </p>
                   </div>
 
-                  {video.status === "waiting_approval" ? (
+                  {video.status === "failed" && (
                     <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
-                      <Link
-                        href={`/videos/${video.id}`}
-                        className="rounded-lg bg-zinc-900 px-4 py-2 text-center text-sm font-medium text-white"
-                      >
-                        Review & approve
-                      </Link>
-
-                      <form action={skipVideo}>
+                      <form action={retryFailedVideo}>
                         <input type="hidden" name="id" value={video.id} />
                         <button
                           type="submit"
-                          className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium"
+                          className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
                         >
-                          Skip
+                          Retry publish
                         </button>
                       </form>
                     </div>
-                  ) : (
-                    <Link
-                      href={`/videos/${video.id}`}
-                      className="shrink-0 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-center text-sm font-medium"
-                    >
-                      View details
-                    </Link>
                   )}
                 </article>
               ))

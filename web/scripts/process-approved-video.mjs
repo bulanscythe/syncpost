@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { GlobalLock } from "./lib/lock.mjs";
 
 const projectRoot = resolve(process.cwd(), "..");
 const db = new DatabaseSync(resolve(projectRoot, "data", "syncpost.sqlite"));
@@ -62,7 +63,49 @@ function requestJson(url, options) {
 async function main() {
   const env = loadEnv();
 
+  const lock = new GlobalLock("publisher.lock", join(projectRoot, "tmp"));
+
+  const handleSignal = () => {
+    lock.release();
+    process.exit(1);
+  };
+  process.on("SIGINT", handleSignal);
+  process.on("SIGTERM", handleSignal);
+
+  if (!lock.acquire()) {
+    console.log("already running; skipped");
+    db.close();
+    return;
+  }
+
+  const stuckJobMinutes = parseInt(env.SYNCPOST_STUCK_JOB_MINUTES || "30", 10);
+  const stuckThreshold = new Date(Date.now() - stuckJobMinutes * 60 * 1000).toISOString();
+
+  const recoveredDownloading = db.prepare(`
+    UPDATE videos
+    SET status = 'approved', updated_at = ?
+    WHERE status = 'downloading' AND updated_at < ?
+  `).run(new Date().toISOString(), stuckThreshold);
+
+  if (recoveredDownloading.changes > 0) {
+    console.log(`Recovered ${recoveredDownloading.changes} stale downloading jobs.`);
+  }
+
+  const recoveredPublishing = db.prepare(`
+    UPDATE videos
+    SET 
+      status = 'failed', 
+      publish_error = 'Interrupted during publishing. Check Instagram before manual retry.',
+      updated_at = ?
+    WHERE status = 'publishing' AND updated_at < ?
+  `).run(new Date().toISOString(), stuckThreshold);
+
+  if (recoveredPublishing.changes > 0) {
+    console.log(`Recovered ${recoveredPublishing.changes} stale publishing jobs as failed.`);
+  }
+
   if (!env.SYNCPOST_PUBLIC_BASE_URL) {
+    lock.release();
     throw new Error("SYNCPOST_PUBLIC_BASE_URL is missing.");
   }
 
@@ -74,6 +117,7 @@ async function main() {
   `).get();
 
   if (!account) {
+    lock.release();
     throw new Error("No Instagram publishing account is connected.");
   }
 
@@ -95,6 +139,7 @@ async function main() {
 
   if (!video) {
     console.log("No approved videos to publish.");
+    lock.release();
     db.close();
     return;
   }
@@ -111,6 +156,7 @@ async function main() {
 
   if (Number(claim.changes) !== 1) {
     console.log("Another worker already claimed this video.");
+    lock.release();
     db.close();
     return;
   }
@@ -211,6 +257,12 @@ async function main() {
 
     console.log("Creating Instagram media container...");
 
+    db.prepare(`
+      UPDATE videos
+      SET publish_attempt_at = ?, updated_at = ?
+      WHERE id = ?
+    `).run(new Date().toISOString(), new Date().toISOString(), video.id);
+
     const apiVersion = env.INSTAGRAM_API_VERSION || "v24.0";
 
     const container = await requestJson(
@@ -235,6 +287,12 @@ async function main() {
     }
 
     console.log(`Processing container: ${container.id}`);
+
+    db.prepare(`
+      UPDATE videos
+      SET instagram_container_id = ?, updated_at = ?
+      WHERE id = ?
+    `).run(container.id, new Date().toISOString(), video.id);
 
     let ready = false;
 
@@ -343,6 +401,7 @@ async function main() {
     }
 
     rmSync(workDir, { recursive: true, force: true });
+    lock.release();
     db.close();
   }
 }

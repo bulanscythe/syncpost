@@ -1,0 +1,11 @@
+===========================================
+ Starting SyncPost Services...
+===========================================
+Starting Next.js Web Server on port 3000...
+Starting Public Gateway on port 3002...
+===========================================
+ Services are running in background!
+ - Next.js: http://localhost:3000 (Logs: web/logs/web.log)
+ - Gateway: http://localhost:3002 (Logs: web/logs/gateway.log)
+===========================================
+Tekan [Ctrl+C] untuk menghentikan kedua layanan.

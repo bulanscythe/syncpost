@@ -4,6 +4,7 @@ import {
   getVideoByYouTubeId,
   removeDevelopmentVideos,
   upsertYouTubeVideo,
+  getSetting,
   type SourceType,
   type Video,
   type YouTubeVideoInput,
@@ -57,7 +58,7 @@ function parseFeed(xml: string): FeedVideo[] {
       links.find((link) => link["@_rel"] === "alternate")?.["@_href"],
     );
 
-    if (!youtubeId || !sourceUrl) return [];
+    if (!youtubeId || !sourceUrl || !sourceUrl.includes("/shorts/")) return [];
 
     const mediaGroup = asRecord(entry["media:group"]);
     const thumbnails = asArray(mediaGroup["media:thumbnail"]).map(asRecord);
@@ -177,6 +178,8 @@ export async function syncYouTubeChannel({
   let metadataIncomplete = 0;
   let metadataLookups = 0;
 
+  const autoApprove = getSetting("auto_approve_shorts") === "1";
+
   for (const entry of entries) {
     const existing = getVideoByYouTubeId(entry.youtubeId);
     const shouldEnrich = refreshMetadata || !existing;
@@ -191,6 +194,11 @@ export async function syncYouTubeChannel({
 
     if (video.metadataError) {
       metadataIncomplete += 1;
+    }
+    
+    if (autoApprove) {
+      video.status = "approved";
+      video.targetType = "reel";
     }
 
     upsertYouTubeVideo(video);
