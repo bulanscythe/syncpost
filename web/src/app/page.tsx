@@ -202,7 +202,7 @@ function ProcessedVideoCard({ video }: { video: ReturnType<typeof listVideos>[0]
           </p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center gap-2">
           {video.status === "failed" && (
              <form action={retryFailedVideo}>
                <input type="hidden" name="id" value={video.id} />
