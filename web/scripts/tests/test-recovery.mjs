@@ -15,6 +15,7 @@ test("Safe Stuck-Job Recovery logic", () => {
   }
 
   const db = new DatabaseSync(dbPath);
+  db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
   
   // Set up schema
   db.exec(`

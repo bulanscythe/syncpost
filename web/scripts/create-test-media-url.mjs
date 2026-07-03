@@ -41,6 +41,7 @@ const token = randomBytes(24).toString("hex");
 const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
 
 const db = new DatabaseSync(resolve(projectRoot, "data", "syncpost.sqlite"));
+db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
 
 db.prepare(`
   INSERT INTO temporary_media_files (

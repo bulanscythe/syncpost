@@ -9,7 +9,7 @@ mkdirSync(dataDir, { recursive: true });
 
 const db = new DatabaseSync(join(dataDir, "syncpost.sqlite"));
 
-db.exec("PRAGMA busy_timeout = 5000;");
+db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS videos (

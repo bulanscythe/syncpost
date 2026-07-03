@@ -17,6 +17,7 @@ test("Token refresh skipping logic", () => {
 
   const dbPath = join(fakeData, "syncpost.sqlite");
   const db = new DatabaseSync(dbPath);
+  db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
   
   db.exec(`
     CREATE TABLE instagram_accounts (

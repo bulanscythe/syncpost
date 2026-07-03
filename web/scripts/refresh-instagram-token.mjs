@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 
 const projectRoot = resolve(process.cwd(), "..");
 const db = new DatabaseSync(resolve(projectRoot, "data", "syncpost.sqlite"));
-db.exec("PRAGMA busy_timeout = 5000;");
+db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");
 
 function loadEnv() {
   const file = join(process.cwd(), ".env.local");
