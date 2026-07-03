@@ -27,7 +27,7 @@ export default function Home() {
               YouTube → Instagram
             </p>
             <h1 className="text-4xl font-semibold tracking-tight">
-              Younstagram
+              SyncPost
             </h1>
             <p className="mt-3 max-w-xl text-zinc-600">
               Review new YouTube uploads before publishing them to Instagram.

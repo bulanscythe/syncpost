@@ -65,7 +65,7 @@ const dataDir = join(projectRoot, "data");
 
 mkdirSync(dataDir, { recursive: true });
 
-const db = new DatabaseSync(join(dataDir, "younstagram.sqlite"));
+const db = new DatabaseSync(join(dataDir, "syncpost.sqlite"));
 
 db.exec("PRAGMA busy_timeout = 5000;");
 
