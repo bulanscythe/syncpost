@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SyncYouTubeButton } from "@/components/SyncYouTubeButton";
 import { skipVideo } from "@/app/actions";
 import { listVideos, type VideoStatus } from "@/lib/db";
 
@@ -69,79 +70,87 @@ export default function Home() {
               </p>
             </div>
 
-            <Link
-              href="/"
-              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium shadow-sm"
-            >
-              Refresh queue
-            </Link>
+            <SyncYouTubeButton />
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-            {videos.map((video) => (
-              <article
-                key={video.id}
-                className="flex flex-col gap-5 border-b border-zinc-100 p-5 last:border-b-0 md:flex-row md:items-center"
-              >
-                <div className="flex h-28 w-full shrink-0 items-end rounded-xl bg-zinc-900 p-3 text-xs font-medium text-white md:w-20">
-                  {formatDuration(video.durationSeconds)}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
-                      {video.sourceType === "short"
-                        ? "YouTube Short"
-                        : "YouTube Video"}
-                    </span>
-                    <StatusBadge status={video.status} />
-                    {video.targetType && (
-                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
-                        {video.targetType === "reel" ? "Reel" : "Feed Post"}
-                      </span>
-                    )}
+            {videos.length === 0 ? (
+              <div className="p-10 text-center text-sm text-zinc-500">
+                No videos yet. Sync YouTube to load recent public uploads.
+              </div>
+            ) : (
+              videos.map((video) => (
+                <article
+                  key={video.id}
+                  className="flex flex-col gap-5 border-b border-zinc-100 p-5 last:border-b-0 md:flex-row md:items-center"
+                >
+                  <div className="flex h-28 w-full shrink-0 items-end rounded-xl bg-zinc-900 p-3 text-xs font-medium text-white md:w-20">
+                    {video.durationSeconds > 0
+                      ? formatDuration(video.durationSeconds)
+                      : "—"}
                   </div>
 
-                  <h3 className="truncate text-base font-semibold">
-                    {video.title}
-                  </h3>
-                  <p className="mt-1 text-sm text-zinc-500">
-                    {formatPublishedAt(video.publishedAt)}
-                  </p>
-                  <p className="mt-3 line-clamp-2 whitespace-pre-line text-sm text-zinc-600">
-                    {video.description}
-                  </p>
-                </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                        {video.sourceType === "short"
+                          ? "YouTube Short"
+                          : "YouTube Video"}
+                      </span>
+                      <StatusBadge status={video.status} />
+                      {video.targetType && (
+                        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
+                          {video.targetType === "reel" ? "Reel" : "Feed Post"}
+                        </span>
+                      )}
+                      {video.metadataError && (
+                        <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-800">
+                          Needs YouTube login
+                        </span>
+                      )}
+                    </div>
 
-                {video.status === "waiting_approval" ? (
-                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
+                    <h3 className="truncate text-base font-semibold">
+                      {video.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      {formatPublishedAt(video.publishedAt)}
+                    </p>
+                    <p className="mt-3 line-clamp-2 whitespace-pre-line text-sm text-zinc-600">
+                      {video.description || "No YouTube description."}
+                    </p>
+                  </div>
+
+                  {video.status === "waiting_approval" ? (
+                    <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
+                      <Link
+                        href={`/videos/${video.id}`}
+                        className="rounded-lg bg-zinc-900 px-4 py-2 text-center text-sm font-medium text-white"
+                      >
+                        Review & approve
+                      </Link>
+
+                      <form action={skipVideo}>
+                        <input type="hidden" name="id" value={video.id} />
+                        <button
+                          type="submit"
+                          className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium"
+                        >
+                          Skip
+                        </button>
+                      </form>
+                    </div>
+                  ) : (
                     <Link
                       href={`/videos/${video.id}`}
-                      className="rounded-lg bg-zinc-900 px-4 py-2 text-center text-sm font-medium text-white"
+                      className="shrink-0 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-center text-sm font-medium"
                     >
-                      Review & approve
+                      View details
                     </Link>
-
-                    <form action={skipVideo}>
-                      <input type="hidden" name="id" value={video.id} />
-                      <button
-                        type="submit"
-                        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium"
-                      >
-                        Skip
-                      </button>
-                    </form>
-                  </div>
-                ) : (
-                  <Link
-                    href={`/videos/${video.id}`}
-                    className="shrink-0 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-center text-sm font-medium"
-                  >
-                    View details
-                  </Link>
-                )}
-              </article>
-            ))}
+                  )}
+                </article>
+              ))
+            )}
           </div>
         </section>
       </div>

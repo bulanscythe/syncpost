@@ -15,7 +15,8 @@ export default async function VideoReviewPage({
 
   if (!video) notFound();
 
-  const canReview = video.status === "waiting_approval";
+  const canReview =
+    video.status === "waiting_approval" && !video.metadataError;
 
   return (
     <main className="min-h-screen bg-zinc-50 px-6 py-10 text-zinc-900 sm:px-10">
@@ -59,8 +60,13 @@ export default async function VideoReviewPage({
             <div>
               <dt className="text-zinc-500">Duration</dt>
               <dd className="mt-1 font-medium">
-                {Math.floor(video.durationSeconds / 60)}:
-                {(video.durationSeconds % 60).toString().padStart(2, "0")}
+                {video.durationSeconds > 0
+                  ? `${Math.floor(video.durationSeconds / 60)}:${(
+                      video.durationSeconds % 60
+                    )
+                      .toString()
+                      .padStart(2, "0")}`
+                  : "Unavailable"}
               </dd>
             </div>
           </dl>
@@ -74,7 +80,16 @@ export default async function VideoReviewPage({
             </div>
           </div>
 
-          {canReview ? (
+          {video.metadataError ? (
+            <div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-900">
+              <p className="font-medium">This upload needs YouTube login.</p>
+              <p className="mt-1">{video.metadataError}</p>
+              <p className="mt-2">
+                Do not approve it yet. We will connect your logged-in browser
+                session before we build the downloader.
+              </p>
+            </div>
+          ) : canReview ? (
             <div className="mt-8">
               <p className="text-sm font-medium text-zinc-500">
                 Instagram destination
@@ -133,7 +148,9 @@ export default async function VideoReviewPage({
           ) : (
             <div className="mt-8 rounded-xl bg-zinc-100 p-4 text-sm text-zinc-700">
               This item has already been marked as{" "}
-              <span className="font-medium">{video.status.replaceAll("_", " ")}</span>.
+              <span className="font-medium">
+                {video.status.replaceAll("_", " ")}
+              </span>.
             </div>
           )}
         </section>
