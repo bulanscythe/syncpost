@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SyncYouTubeButton } from "@/components/SyncYouTubeButton";
 import { skipVideo } from "@/app/actions";
-import { listVideos, type VideoStatus } from "@/lib/db";
+import { getInstagramAccount, listVideos, type VideoStatus } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,7 @@ const statusLabels: Record<VideoStatus, string> = {
 
 export default function Home() {
   const videos = listVideos();
+  const instagramAccount = getInstagramAccount();
 
   return (
     <main className="min-h-screen bg-zinc-50 px-6 py-10 text-zinc-900 sm:px-10">
@@ -35,8 +36,22 @@ export default function Home() {
           </div>
 
           <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm shadow-sm">
-            <p className="text-zinc-500">Whitelisted channel</p>
-            <p className="mt-1 font-medium">Dummy YouTube Channel</p>
+            <p className="text-zinc-500">Instagram publishing account</p>
+            {instagramAccount ? (
+              <>
+                <p className="mt-1 font-medium">@{instagramAccount.username}</p>
+                <p className="mt-1 text-xs text-emerald-700">
+                  Connected · {instagramAccount.accountType || "Professional"}
+                </p>
+              </>
+            ) : (
+              <a
+                href="/api/auth/instagram"
+                className="mt-2 inline-block rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white"
+              >
+                Connect Instagram
+              </a>
+            )}
           </div>
         </header>
 

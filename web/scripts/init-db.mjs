@@ -41,6 +41,24 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS videos_status_idx ON videos(status);
   CREATE INDEX IF NOT EXISTS videos_published_at_idx ON videos(published_at DESC);
+
+
+  CREATE TABLE IF NOT EXISTS instagram_accounts (
+    id TEXT PRIMARY KEY,
+    instagram_user_id TEXT NOT NULL UNIQUE,
+    username TEXT NOT NULL,
+    account_type TEXT,
+    access_token TEXT NOT NULL,
+    connected_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS oauth_states (
+    state TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `);
 
 const columns = db.prepare("PRAGMA table_info(videos)").all();

@@ -5,3 +5,5 @@ data/
 tmp/
 .DS_Store
 !.env.example
+
+!web/.env.example

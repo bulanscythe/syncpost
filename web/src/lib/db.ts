@@ -222,3 +222,104 @@ export function removeDevelopmentVideos() {
     WHERE youtube_id LIKE 'development-%'
   `).run();
 }
+
+
+export type InstagramAccount = {
+  instagramUserId: string;
+  username: string;
+  accountType: string | null;
+  connectedAt: string;
+};
+
+export function createOAuthState(state: string, provider: string) {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
+
+  db.prepare(`
+    INSERT INTO oauth_states (state, provider, expires_at, created_at)
+    VALUES (?, ?, ?, ?)
+  `).run(state, provider, expiresAt, now.toISOString());
+}
+
+export function consumeOAuthState(state: string, provider: string) {
+  const row = db.prepare(`
+    SELECT expires_at
+    FROM oauth_states
+    WHERE state = ? AND provider = ?
+  `).get(state, provider) as { expires_at: string } | undefined;
+
+  db.prepare(`
+    DELETE FROM oauth_states
+    WHERE state = ? AND provider = ?
+  `).run(state, provider);
+
+  return Boolean(row && new Date(row.expires_at) > new Date());
+}
+
+export function saveInstagramAccount({
+  instagramUserId,
+  username,
+  accountType,
+  accessToken,
+}: {
+  instagramUserId: string;
+  username: string;
+  accountType: string | null;
+  accessToken: string;
+}) {
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    INSERT INTO instagram_accounts (
+      id,
+      instagram_user_id,
+      username,
+      account_type,
+      access_token,
+      connected_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(instagram_user_id) DO UPDATE SET
+      username = excluded.username,
+      account_type = excluded.account_type,
+      access_token = excluded.access_token,
+      updated_at = excluded.updated_at
+  `).run(
+    `ig-${instagramUserId}`,
+    instagramUserId,
+    username,
+    accountType,
+    accessToken,
+    now,
+    now,
+  );
+}
+
+export function getInstagramAccount(): InstagramAccount | null {
+  const row = db.prepare(`
+    SELECT
+      instagram_user_id,
+      username,
+      account_type,
+      connected_at
+    FROM instagram_accounts
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `).get() as
+    | {
+        instagram_user_id: string;
+        username: string;
+        account_type: string | null;
+        connected_at: string;
+      }
+    | undefined;
+
+  if (!row) return null;
+
+  return {
+    instagramUserId: row.instagram_user_id,
+    username: row.username,
+    accountType: row.account_type,
+    connectedAt: row.connected_at,
+  };
+}
