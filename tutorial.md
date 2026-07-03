@@ -66,7 +66,7 @@ Run this single command to turn on the **entire ecosystem** of SyncPost:
 ./run-all.sh
 ```
 
-This command will start 4 main engines simultaneously in your terminal:
+This command will start 4 main engines simultaneously in your terminal, wrapped in auto-restarting loops to ensure maximum uptime and self-healing if a crash occurs:
 - **Next.js Web Server**: Dashboard interface on port 3000.
 - **Public Gateway**: A secure communication bridge with Instagram on port 3002.
 - **Publisher Daemon**: A robot that runs every 1 minute to upload videos to Instagram.

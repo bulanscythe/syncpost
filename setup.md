@@ -38,7 +38,7 @@ Instead of modifying hidden configuration *files* (`.env.local`) manually, we ha
 
 ## 5. Run the Application
 After `preflight.sh` finishes:
-1. Run `./run-all.sh`.
+1. Run `./run-all.sh`. This starts all services with an auto-restart (self-healing) mechanism enabled.
 2. Open the Dashboard at `http://localhost:3000`.
 3. Click **Connect Instagram** to link your new target account.
 4. Click **Sync YouTube** to pull *Shorts* from your new channel.

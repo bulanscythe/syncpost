@@ -12,6 +12,7 @@ It is designed to be highly portable and can run locally on your computer, VPS, 
 - **Auto-Approve Option**: Toggle auto-approve on the dashboard to bypass manual review and publish immediately.
 - **Bulk Actions**: Select multiple videos at once to approve them for publishing.
 - **Self-Hosted Ecosystem**: Operates via Next.js Web Server, a Public Gateway for Instagram Callbacks, a Publisher Daemon, and a YouTube Sync Daemon.
+- **Auto-Recovery / Self-Healing**: The system runs robust background loops for all services, allowing it to automatically restart itself if any component crashes unexpectedly.
 
 ## Documentation
 

@@ -29,20 +29,41 @@ trap cleanup SIGINT SIGTERM
 
 # 1. Jalankan Next.js Web Server 
 echo "[System] Starting Next.js Web Server (Port 3000)..."
-./scripts/run-web.sh &
+(
+  trap 'kill $(jobs -p) 2>/dev/null; exit 0' SIGINT SIGTERM EXIT
+  while true; do
+    ./scripts/run-web.sh &
+    wait $!
+    echo "[System] Next.js Web Server stopped. Restarting in 3 seconds..."
+    sleep 3 &
+    wait $!
+  done
+) &
 WEB_PID=$!
 
 # 2. Jalankan Public Gateway
 echo "[System] Starting Public Gateway (Port 3002)..."
-./scripts/run-public-gateway.sh &
+(
+  trap 'kill $(jobs -p) 2>/dev/null; exit 0' SIGINT SIGTERM EXIT
+  while true; do
+    ./scripts/run-public-gateway.sh &
+    wait $!
+    echo "[System] Public Gateway stopped. Restarting in 3 seconds..."
+    sleep 3 &
+    wait $!
+  done
+) &
 GATEWAY_PID=$!
 
 # 3. Jalankan Loop Publisher (Cek video yang disetujui tiap 1 menit)
 echo "[System] Starting Publisher Daemon..."
 (
+  trap 'kill $(jobs -p) 2>/dev/null; exit 0' SIGINT SIGTERM EXIT
   while true; do
-    ./scripts/run-publisher-once.sh
-    sleep 60
+    ./scripts/run-publisher-once.sh &
+    wait $!
+    sleep 60 &
+    wait $!
   done
 ) &
 PUBLISHER_PID=$!
@@ -50,9 +71,12 @@ PUBLISHER_PID=$!
 # 4. Jalankan Loop YouTube Sync (Tarik video baru tiap 15 menit)
 echo "[System] Starting YouTube Sync Daemon..."
 (
+  trap 'kill $(jobs -p) 2>/dev/null; exit 0' SIGINT SIGTERM EXIT
   while true; do
-    ./scripts/run-youtube-sync-once.sh
-    sleep 900
+    ./scripts/run-youtube-sync-once.sh &
+    wait $!
+    sleep 900 &
+    wait $!
   done
 ) &
 SYNC_PID=$!
