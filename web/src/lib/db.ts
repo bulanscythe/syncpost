@@ -526,3 +526,10 @@ export function setSetting(key: string, value: string) {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
   `).run(key, value);
 }
+
+export function deleteVideo(id: string) {
+  db.prepare(`
+    DELETE FROM videos
+    WHERE id = ?
+  `).run(id);
+}

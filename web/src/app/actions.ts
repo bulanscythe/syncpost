@@ -58,3 +58,12 @@ export async function toggleAutoApprove(enabled: boolean) {
   setSetting("auto_approve_shorts", enabled ? "1" : "0");
   revalidatePath("/");
 }
+
+export async function deleteVideoLog(formData: FormData) {
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) return;
+
+  const { deleteVideo } = await import("@/lib/db");
+  deleteVideo(id);
+  revalidatePath("/");
+}

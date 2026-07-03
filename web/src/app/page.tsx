@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SyncYouTubeButton } from "@/components/SyncYouTubeButton";
-import { skipVideo, retryFailedVideo } from "@/app/actions";
+import { skipVideo, retryFailedVideo, deleteVideoLog } from "@/app/actions";
 import { getInstagramAccount, listVideos, getSetting, type VideoStatus } from "@/lib/db";
 import { ReviewQueueClient } from "@/components/ReviewQueueClient";
 import { AutoApproveToggle } from "@/components/AutoApproveToggle";
@@ -202,17 +202,29 @@ function ProcessedVideoCard({ video }: { video: ReturnType<typeof listVideos>[0]
           </p>
         </div>
 
-        {video.status === "failed" && (
-           <form action={retryFailedVideo} className="shrink-0" onClick={(e) => e.stopPropagation()}>
-             <input type="hidden" name="id" value={video.id} />
-             <button
-               type="submit"
-               className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-             >
-               Retry publish
-             </button>
-           </form>
-        )}
+        <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          {video.status === "failed" && (
+             <form action={retryFailedVideo}>
+               <input type="hidden" name="id" value={video.id} />
+               <button
+                 type="submit"
+                 className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+               >
+                 Retry publish
+               </button>
+             </form>
+          )}
+          <form action={deleteVideoLog}>
+            <input type="hidden" name="id" value={video.id} />
+            <button
+              type="submit"
+              className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+              title="Delete this log"
+            >
+              Delete
+            </button>
+          </form>
+        </div>
       </summary>
       
       <div className="mt-6 grid gap-6 border-t border-zinc-100 pt-6 md:grid-cols-2">
