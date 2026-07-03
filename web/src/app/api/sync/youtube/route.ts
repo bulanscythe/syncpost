@@ -3,9 +3,12 @@ import { syncYouTubeChannel } from "@/lib/youtube";
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    const result = await syncYouTubeChannel();
+    const refreshMetadata =
+      new URL(request.url).searchParams.get("refreshMetadata") === "1";
+
+    const result = await syncYouTubeChannel({ refreshMetadata });
     return NextResponse.json(result);
   } catch (error) {
     const message =

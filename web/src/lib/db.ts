@@ -151,6 +151,34 @@ export function getVideoById(id: string): Video | null {
   return row ? mapVideoRow(row) : null;
 }
 
+export function getVideoByYouTubeId(
+  youtubeId: string,
+): Video | null {
+  const row = db
+    .prepare(`
+      SELECT
+        id,
+        youtube_id,
+        title,
+        description,
+        source_type,
+        source_url,
+        thumbnail_url,
+        duration_seconds,
+        status,
+        target_type,
+        metadata_error,
+        published_at,
+        created_at,
+        updated_at
+      FROM videos
+      WHERE youtube_id = ?
+    `)
+    .get(youtubeId) as unknown as VideoRow | undefined;
+
+  return row ? mapVideoRow(row) : null;
+}
+
 export function updateVideoStatus(id: string, status: VideoStatus) {
   db.prepare(`
     UPDATE videos

@@ -1,9 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { XMLParser } from "fast-xml-parser";
 import {
+  getVideoByYouTubeId,
   removeDevelopmentVideos,
   upsertYouTubeVideo,
   type SourceType,
+  type Video,
   type YouTubeVideoInput,
 } from "@/lib/db";
 
@@ -76,7 +78,27 @@ function parseFeed(xml: string): FeedVideo[] {
   });
 }
 
-function enrichWithYtDlp(video: FeedVideo): YouTubeVideoInput {
+function useFeedData(
+  video: FeedVideo,
+  existing?: Video,
+): YouTubeVideoInput {
+  return {
+    youtubeId: video.youtubeId,
+    title: video.title,
+    description: video.description,
+    sourceType: video.sourceType,
+    sourceUrl: video.sourceUrl,
+    thumbnailUrl: existing?.thumbnailUrl || video.thumbnailUrl,
+    durationSeconds: existing?.durationSeconds ?? 0,
+    metadataError: existing?.metadataError ?? null,
+    publishedAt: video.publishedAt,
+  };
+}
+
+function enrichWithYtDlp(
+  video: FeedVideo,
+  existing?: Video,
+): YouTubeVideoInput {
   try {
     const raw = execFileSync(
       "yt-dlp",
@@ -96,7 +118,7 @@ function enrichWithYtDlp(video: FeedVideo): YouTubeVideoInput {
     const metadata = JSON.parse(raw) as Record<string, unknown>;
 
     return {
-      youtubeId: video.youtubeId,
+      ...useFeedData(video, existing),
       title:
         typeof metadata.title === "string" && metadata.title.trim()
           ? metadata.title
@@ -105,8 +127,6 @@ function enrichWithYtDlp(video: FeedVideo): YouTubeVideoInput {
         typeof metadata.description === "string"
           ? metadata.description
           : video.description,
-      sourceType: video.sourceType,
-      sourceUrl: video.sourceUrl,
       thumbnailUrl:
         typeof metadata.thumbnail === "string"
           ? metadata.thumbnail
@@ -114,21 +134,27 @@ function enrichWithYtDlp(video: FeedVideo): YouTubeVideoInput {
       durationSeconds:
         typeof metadata.duration === "number"
           ? Math.round(metadata.duration)
-          : 0,
+          : existing?.durationSeconds ?? 0,
       metadataError: null,
-      publishedAt: video.publishedAt,
     };
   } catch {
+    if (existing) {
+      return useFeedData(video, existing);
+    }
+
     return {
-      ...video,
-      durationSeconds: 0,
+      ...useFeedData(video),
       metadataError:
         "Could not read full YouTube metadata. This video may require a logged-in YouTube session.",
     };
   }
 }
 
-export async function syncYouTubeChannel() {
+export async function syncYouTubeChannel({
+  refreshMetadata = false,
+}: {
+  refreshMetadata?: boolean;
+} = {}) {
   const channelId = process.env.YOUTUBE_CHANNEL_ID?.trim();
 
   if (!channelId) {
@@ -149,9 +175,19 @@ export async function syncYouTubeChannel() {
   removeDevelopmentVideos();
 
   let metadataIncomplete = 0;
+  let metadataLookups = 0;
 
   for (const entry of entries) {
-    const video = enrichWithYtDlp(entry);
+    const existing = getVideoByYouTubeId(entry.youtubeId);
+    const shouldEnrich = refreshMetadata || !existing;
+
+    const video = shouldEnrich
+      ? enrichWithYtDlp(entry, existing || undefined)
+      : useFeedData(entry, existing);
+
+    if (shouldEnrich) {
+      metadataLookups += 1;
+    }
 
     if (video.metadataError) {
       metadataIncomplete += 1;
@@ -163,5 +199,6 @@ export async function syncYouTubeChannel() {
   return {
     synced: entries.length,
     metadataIncomplete,
+    metadataLookups,
   };
 }

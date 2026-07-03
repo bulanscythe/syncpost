@@ -13,7 +13,7 @@ export function SyncYouTubeButton() {
     setMessage(null);
 
     try {
-      const response = await fetch("/api/sync/youtube", {
+      const response = await fetch("/api/sync/youtube?refreshMetadata=1", {
         method: "POST",
       });
 
