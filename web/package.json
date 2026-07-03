@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:init": "node scripts/init-db.mjs"
+    "db:init": "node scripts/init-db.mjs",
+    "db:publisher": "node scripts/init-publisher-db.mjs",
+    "publish:once": "npm run db:publisher && node scripts/process-approved-video.mjs"
   },
   "dependencies": {
     "fast-xml-parser": "^5.9.3",
