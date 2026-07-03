@@ -139,21 +139,19 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatusBadge({ status }: { status: VideoStatus }) {
+function StatusText({ status }: { status: VideoStatus }) {
   const styles: Record<VideoStatus, string> = {
-    waiting_approval: "bg-amber-50 text-amber-800 ring-amber-200",
-    approved: "bg-blue-50 text-blue-800 ring-blue-200",
-    downloading: "bg-violet-50 text-violet-800 ring-violet-200",
-    publishing: "bg-violet-50 text-violet-800 ring-violet-200",
-    published: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-    skipped: "bg-zinc-100 text-zinc-700 ring-zinc-200",
-    failed: "bg-red-50 text-red-800 ring-red-200",
+    waiting_approval: "text-amber-600",
+    approved: "text-blue-600",
+    downloading: "text-violet-600",
+    publishing: "text-violet-600",
+    published: "text-emerald-600",
+    skipped: "text-zinc-600",
+    failed: "text-red-600",
   };
 
   return (
-    <span
-      className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${styles[status]}`}
-    >
+    <span className={`font-semibold ${styles[status]}`}>
       {statusLabels[status]}
     </span>
   );
@@ -184,7 +182,6 @@ function ProcessedVideoCard({ video }: { video: ReturnType<typeof listVideos>[0]
             <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
               {video.sourceType === "short" ? "YouTube Short" : "YouTube Video"}
             </span>
-            <StatusBadge status={video.status} />
             {video.targetType && (
               <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
                 {video.targetType === "reel" ? "Reel" : "Feed Post"}
@@ -199,6 +196,9 @@ function ProcessedVideoCard({ video }: { video: ReturnType<typeof listVideos>[0]
           <h3 className="text-base font-semibold group-open:text-zinc-900">{video.title}</h3>
           <p className="mt-1 text-sm text-zinc-500">
             {formatDuration(video.durationSeconds)} · {formatPublishedAt(video.publishedAt)}
+          </p>
+          <p className="mt-1 text-sm text-zinc-700">
+            Status: <StatusText status={video.status} />
           </p>
         </div>
 
